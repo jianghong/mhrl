@@ -1,6 +1,7 @@
 use std::fs;
 use toml::{from_str};
 
+#[derive(Deserialize, Clone, Copy, Debug)]
 pub struct Coordinate {
 	pub x: i32,
 	pub y: i32,
@@ -15,13 +16,14 @@ pub struct Size {
 #[derive(Deserialize, Debug, Clone)]
 pub struct ObjectMetadata {
 	pub name: String,
+	pub character: char,
 	pub size: Size
 }
 
 #[derive(Deserialize, Debug)]
 pub struct ObjectsMetadata {
 	pub dragon: ObjectMetadata,
-	player: ObjectMetadata,
+	pub player: ObjectMetadata,
 }
 
 pub struct Object {
@@ -37,6 +39,10 @@ impl Object {
 			position: position,
 			metadata: metadata,
 		}
+	}
+
+	pub fn set_pos(&mut self, new_coord: Coordinate) {
+		self.position = new_coord;
 	}
 }
 

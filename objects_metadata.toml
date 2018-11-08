@@ -1,11 +1,13 @@
 [player]
 	name = "Player"
+	character = '@'
 	[player.size]
 		width = 1
 		height = 1
 
 [dragon]
 	name = "Dragon Boss"
+	character = 'D'
 	[dragon.size]
 		width = 5
 		height = 5

@@ -2,20 +2,28 @@ mod objects;
 
 use objects::*;
 
+mod utils;
+use utils::ensure_valid_coordinate;
+
+mod input_controller;
+use input_controller::handle_keys;
+
 extern crate tcod;
+use tcod::console::*;
+use tcod::colors;
+use tcod::input::{self, Event, Key};
+
+
 extern crate toml;
+
 #[macro_use]
 extern crate serde_derive;
 
-use tcod::console::*;
-use tcod::colors;
-
-
 const SCREEN_WIDTH: i32 = 150;
 const SCREEN_HEIGHT: i32 = 100;
-const LIMIT_FPS: i32 = 60;
+const LIMIT_FPS: i32 = 20;
 
-struct Tcod {
+pub struct Tcod {
 	root: Root,
 }
 
@@ -37,40 +45,39 @@ fn main() {
 	let game = Game {
 		objects_metadata: get_objects_metadata(),
 	};
+	let mut player_pos = Coordinate{x: (SCREEN_WIDTH / 2) - 5, y: (SCREEN_HEIGHT / 2) - 5};
+	let mut key: Key = Default::default();
 
 	while !tcod.root.window_closed() {
+		match input::check_for_event(input::KEY_PRESS) {
+			Some((_, Event::Key(k))) => key = k,
+			_ => key = Default::default(),
+		}
+
 	    tcod.root.set_default_foreground(colors::WHITE);
-	    tcod.root.clear();
-	    draw_boss(&game, &mut tcod, Coordinate{x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT / 2});
+	    draw_object(&game.objects_metadata.dragon, &mut tcod, Coordinate{x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT / 2});
+	    draw_object(&game.objects_metadata.player, &mut tcod, player_pos);
 	    tcod.root.flush();
-	    tcod.root.wait_for_keypress(true);
+
+	    tcod.root.put_char(player_pos.x, player_pos.y, ' ', BackgroundFlag::None);
+        let exit = handle_keys(key, &mut tcod, &mut player_pos.x, &mut player_pos.y);
+        if exit {
+            break
+        }
 	}
 }
 
-fn draw_boss(game: &Game, tcod: &mut Tcod, top_left_coordinates: Coordinate) {
-	let boss_metadata = &game.objects_metadata.dragon;
-	let valid_coordinate = ensure_valid_coordinate(top_left_coordinates, &boss_metadata.size);
-	let dragon = Object::new("Dragon boss", valid_coordinate, boss_metadata.clone());
+fn draw_object(object_metadata: &ObjectMetadata, tcod: &mut Tcod, top_left_coordinates: Coordinate) -> Object {
+	let valid_coordinate = ensure_valid_coordinate(top_left_coordinates, &object_metadata.size);
+	let object = Object::new(&object_metadata.name, valid_coordinate, object_metadata.clone());
 
 
-	for i in 0..boss_metadata.size.width {
-		tcod.root.put_char(dragon.position.x + i, dragon.position.y, 'D', BackgroundFlag::None);
-		for j in 0..boss_metadata.size.height {
-			tcod.root.put_char(dragon.position.x + i, dragon.position.y + j, 'D', BackgroundFlag::None);
+	for i in 0..object_metadata.size.width {
+		tcod.root.put_char(object.position.x + i, object.position.y, object_metadata.character, BackgroundFlag::None);
+		for j in 0..object_metadata.size.height {
+			tcod.root.put_char(object.position.x + i, object.position.y + j, object_metadata.character, BackgroundFlag::None);
 		}
 	}
-}
 
-fn ensure_valid_coordinate(coordinate: Coordinate, size: &Size) -> Coordinate {
-	let verified_x = if coordinate.x + size.width > SCREEN_WIDTH {
-		SCREEN_WIDTH - size.width
-	} else {
-		coordinate.x
-	};
-	let verified_y = if coordinate.y + size.height > SCREEN_HEIGHT {
-		SCREEN_HEIGHT - size.height
-	} else {
-		coordinate.y
-	};
-	Coordinate{x: verified_x, y: verified_y}
+	object
 }
