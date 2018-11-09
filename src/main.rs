@@ -37,6 +37,49 @@ struct Game {
 	turn: i32,
 }
 
+#[derive(Clone, Copy, Debug)]
+enum DelayedAttackCallback {
+	SlamStart,
+	SlamEnd,
+}
+
+#[derive(Clone, Debug)]
+struct DelayedAttack {
+	coordinates: Vec<Coordinate>,
+	starting_turn: i32,
+	ends_in: i32,
+	started: bool,
+	start: DelayedAttackCallback,
+	end: DelayedAttackCallback,
+}
+
+impl DelayedAttackCallback {
+	fn callback(self, coordinates: Vec<Coordinate>, tcod: &mut Tcod) {
+		use DelayedAttackCallback::*;
+		let callback: fn(Vec<Coordinate>, &mut Tcod) = match self {
+			SlamStart => slam_start,
+			SlamEnd => slam_end,
+		};
+		callback(coordinates, tcod);		
+	}
+}
+
+fn slam_start(coordinates: Vec<Coordinate>, tcod: &mut Tcod) {
+	for coordinate in coordinates {
+		println!("Setting {:?} to yellow", coordinate);
+		tcod.root.set_char_background(coordinate.x, coordinate.y, colors::YELLOW, BackgroundFlag::Set);
+	}
+	println!("start slam");
+}
+
+fn slam_end(coordinates: Vec<Coordinate>, tcod: &mut Tcod) {
+	for coordinate in coordinates {
+		println!("Setting {:?} to black", coordinate);
+		tcod.root.set_char_background(coordinate.x, coordinate.y, colors::BLACK, BackgroundFlag::Set);
+	}
+	println!("end slam");
+}
+
 fn main() {
 	let root = Root::initializer()
 	    .font("terminal8x8_gs_ro.png", FontLayout::AsciiInRow)
@@ -48,16 +91,33 @@ fn main() {
 	let mut tcod = Tcod {
 		root: root,
 	};
+	tcod.root.set_keyboard_repeat(100, 0);
 	let mut game = Game {
 		objects_metadata: get_objects_metadata(),
 		turn: 1,
 	};
 	let mut player_pos = Coordinate{x: (SCREEN_WIDTH / 2) - 5, y: (SCREEN_HEIGHT / 2) - 5};
 	let mut key: Key = Default::default();
-	let (tx, rx) = mpsc::channel();
 
+	// handle turn clock
+	let (tx, rx) = mpsc::channel();
 	spawn_turn_clock(tx);
 
+	let mut delayed_attacks: Vec<DelayedAttack> = vec![];
+	let dragon_coords = Coordinate{x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT / 2};
+	let mut slam = DelayedAttack{
+		coordinates: vec![Coordinate{x: dragon_coords.x - 1, y: dragon_coords.y}, Coordinate{x: dragon_coords.x - 1, y: dragon_coords.y + 1}],
+		starting_turn: game.turn,
+		ends_in: 2,
+		started: false,
+		start: DelayedAttackCallback::SlamStart,
+		end: DelayedAttackCallback::SlamEnd,	    	
+	};
+	slam.start.callback(slam.coordinates.clone(), &mut tcod);
+	slam.started = true;
+    delayed_attacks.push(slam);
+
+	println!("{:?}", delayed_attacks);
 	while !tcod.root.window_closed() {
 		log_turn(&mut tcod, &game);
 		match input::check_for_event(input::KEY_PRESS) {
@@ -65,9 +125,26 @@ fn main() {
 			_ => key = Default::default(),
 		}
 
+		// draw shit
 	    tcod.root.set_default_foreground(colors::WHITE);
-	    draw_object(&game.objects_metadata.dragon, &mut tcod, Coordinate{x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT / 2});
+	    
+	   	// check delayed attack ends
+	   	let mut ended_attacks: Vec<usize> = vec![];
+	    for (index, attack) in delayed_attacks.iter().enumerate() {
+	    	if (game.turn - attack.starting_turn) >= attack.ends_in {
+	    		attack.end.callback(attack.coordinates.clone(), &mut tcod);
+	    		ended_attacks.push(index);
+	    	}
+	    }
+
+	    for ended_attack in ended_attacks {
+	    	delayed_attacks.remove(ended_attack);
+	    }
+
+
+	    draw_object(&game.objects_metadata.dragon, &mut tcod, dragon_coords);
 	    draw_object(&game.objects_metadata.player, &mut tcod, player_pos);
+
 	    tcod.root.flush();
 
 	    tcod.root.put_char(player_pos.x, player_pos.y, ' ', BackgroundFlag::None);
