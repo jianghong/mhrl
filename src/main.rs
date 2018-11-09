@@ -1,3 +1,8 @@
+use std::sync::mpsc::Sender;
+use std::time::{Duration, Instant};
+use std::thread;
+use std::sync::mpsc;
+
 mod objects;
 
 use objects::*;
@@ -29,6 +34,7 @@ pub struct Tcod {
 
 struct Game {
 	objects_metadata: ObjectsMetadata,
+	turn: i32,
 }
 
 fn main() {
@@ -42,13 +48,18 @@ fn main() {
 	let mut tcod = Tcod {
 		root: root,
 	};
-	let game = Game {
+	let mut game = Game {
 		objects_metadata: get_objects_metadata(),
+		turn: 1,
 	};
 	let mut player_pos = Coordinate{x: (SCREEN_WIDTH / 2) - 5, y: (SCREEN_HEIGHT / 2) - 5};
 	let mut key: Key = Default::default();
+	let (tx, rx) = mpsc::channel();
+
+	spawn_turn_clock(tx);
 
 	while !tcod.root.window_closed() {
+		log_turn(&mut tcod, &game);
 		match input::check_for_event(input::KEY_PRESS) {
 			Some((_, Event::Key(k))) => key = k,
 			_ => key = Default::default(),
@@ -64,6 +75,12 @@ fn main() {
         if exit {
             break
         }
+
+        let val = match rx.try_recv() {
+			Ok(v) => v,
+			Err(_) => 0,
+        };
+        game.turn += val;
 	}
 }
 
@@ -80,4 +97,21 @@ fn draw_object(object_metadata: &ObjectMetadata, tcod: &mut Tcod, top_left_coord
 	}
 
 	object
+}
+
+fn log_turn(tcod: &mut Tcod, game: &Game) {
+	let turns_text = format!("Turn: {}", game.turn);
+	tcod.root.print_ex(1, 1, BackgroundFlag::None, TextAlignment::Left, turns_text);
+}
+
+fn spawn_turn_clock(tx: Sender<i32>) {
+	thread::spawn(move || {
+		let mut previous_instant = Instant::now();
+		loop {
+	        if previous_instant.elapsed().subsec_millis() == 999 {
+	        	previous_instant = Instant::now();
+            	tx.send(1).expect("Transmission failed");
+	        }
+		};
+    });
 }
