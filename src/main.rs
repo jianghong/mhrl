@@ -1,5 +1,5 @@
 use std::sync::mpsc::Sender;
-use std::time::{Duration, Instant};
+use std::time::{Instant};
 use std::thread;
 use std::sync::mpsc;
 
@@ -66,18 +66,14 @@ impl DelayedAttackCallback {
 
 fn slam_start(coordinates: Vec<Coordinate>, tcod: &mut Tcod) {
 	for coordinate in coordinates {
-		println!("Setting {:?} to yellow", coordinate);
 		tcod.root.set_char_background(coordinate.x, coordinate.y, colors::YELLOW, BackgroundFlag::Set);
 	}
-	println!("start slam");
 }
 
 fn slam_end(coordinates: Vec<Coordinate>, tcod: &mut Tcod) {
 	for coordinate in coordinates {
-		println!("Setting {:?} to black", coordinate);
 		tcod.root.set_char_background(coordinate.x, coordinate.y, colors::BLACK, BackgroundFlag::Set);
 	}
-	println!("end slam");
 }
 
 fn main() {
@@ -91,7 +87,7 @@ fn main() {
 	let mut tcod = Tcod {
 		root: root,
 	};
-	tcod.root.set_keyboard_repeat(100, 0);
+	tcod.root.set_keyboard_repeat(1, 0);
 	let mut game = Game {
 		objects_metadata: get_objects_metadata(),
 		turn: 1,
@@ -117,7 +113,6 @@ fn main() {
 	slam.started = true;
     delayed_attacks.push(slam);
 
-	println!("{:?}", delayed_attacks);
 	while !tcod.root.window_closed() {
 		log_turn(&mut tcod, &game);
 		match input::check_for_event(input::KEY_PRESS) {

@@ -40,10 +40,6 @@ impl Object {
 			metadata: metadata,
 		}
 	}
-
-	pub fn set_pos(&mut self, new_coord: Coordinate) {
-		self.position = new_coord;
-	}
 }
 
 pub fn get_objects_metadata() -> ObjectsMetadata {
